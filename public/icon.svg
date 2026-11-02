@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#9333ea" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0.2" />
+    </linearGradient>
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background Base com bordas arredondadas padrão Play Store (Squircle) -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" stroke="#1e293b" stroke-width="4" />
+
+  <!-- Anel de Brilho Hexagonal / Cibernético -->
+  <circle cx="256" cy="256" r="170" fill="none" stroke="url(#glowGrad)" stroke-width="4" stroke-dasharray="16 12" />
+
+  <!-- Ícone Cabeça Robótica AGI Jobs Digital -->
+  <g filter="url(#neonGlow)">
+    <!-- Orelhas / Antenas do Robô -->
+    <rect x="96" y="232" width="28" height="48" rx="8" fill="#ea580c" opacity="0.9" />
+    <rect x="388" y="232" width="28" height="48" rx="8" fill="#9333ea" opacity="0.9" />
+    
+    <circle cx="110" cy="216" r="6" fill="#f59e0b" />
+    <circle cx="402" cy="216" r="6" fill="#c084fc" />
+
+    <!-- Cabeça Principal -->
+    <rect x="136" y="152" width="240" height="208" rx="44" fill="url(#brandGrad)" />
+    
+    <!-- Visor Frontal Cibernético -->
+    <rect x="160" y="180" width="192" height="96" rx="28" fill="#050811" stroke="#334155" stroke-width="3" />
+
+    <!-- Olhos AGI Brilhantes -->
+    <circle cx="208" cy="228" r="18" fill="#38bdf8" />
+    <circle cx="208" cy="228" r="8" fill="#ffffff" />
+    <circle cx="304" cy="228" r="18" fill="#38bdf8" />
+    <circle cx="304" cy="228" r="8" fill="#ffffff" />
+
+    <!-- Sorriso de Conexão Neural -->
+    <path d="M 224 316 Q 256 336 288 316" stroke="#ffffff" stroke-width="6" stroke-linecap="round" fill="none" />
+
+    <!-- Núcleo de Processamento Peito / Base -->
+    <circle cx="256" cy="400" r="14" fill="#f59e0b" />
+    <path d="M 256 360 L 256 386" stroke="#f97316" stroke-width="4" stroke-dasharray="4 4" />
+  </g>
+
+  <!-- Tag AGI v5.0 -->
+  <rect x="186" y="440" width="140" height="34" rx="17" fill="#0f172a" stroke="#ea580c" stroke-width="2" />
+  <text x="256" y="463" font-family="'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="800" fill="#f8fafc" text-anchor="middle" letter-spacing="2">AGI v5.0</text>
+</svg>

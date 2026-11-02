@@ -1,0 +1,6 @@
+{
+  "name": "Jobs Digital — Cérebro AGI v5.0",
+  "description": "Plataforma de agentes autônomos de inteligência técnica, comercial e operacional da Jobs Digital. Vitrine de profissões, esteira de ativação com WhatsApp/Telegram, pagamento Pix e supervisão humana HITL.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
