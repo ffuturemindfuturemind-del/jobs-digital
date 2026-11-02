@@ -47,6 +47,20 @@ let conversas: Map<string, Conversa> = new Map();
 let escalasHumanas: Map<string, EscalaHumana> = new Map();
 let routerLogs: RouterLog[] = [];
 
+// Trava Estrita: 1 Único Teste Gratuito por Empresa / Visitante
+export interface RegistroTesteGratis {
+  id: string;
+  agenteId: string;
+  templateId: string;
+  nomeAgente: string;
+  nomeEmpresa: string;
+  whatsapp: string;
+  iniciadoEm: string;
+  expiraEm: string;
+  expirado: boolean;
+}
+let registrosTestesGratis: Map<string, RegistroTesteGratis> = new Map();
+
 interface UsuarioCred {
   id: string;
   nome: string;
@@ -746,12 +760,83 @@ app.post('/api/agentes/ativar', (req, res) => {
   });
 });
 
-// 7.1. Iniciar Período de Teste Gratuito de 5 Horas (Sem Cartão / Imediato)
+// 7.1. Iniciar Período de Teste Gratuito de 5 Horas (TRAVA: 1 ÚNICO TESTE POR EMPRESA/DISPOSITIVO)
+app.get('/api/agentes/status-teste-gratis', (req, res) => {
+  const zapQuery = ((req.query.whatsapp as string) || '').replace(/\D/g, '');
+  const empQuery = ((req.query.empresa as string) || '').trim().toLowerCase();
+
+  let registro = Array.from(registrosTestesGratis.values()).find((r) => {
+    if (zapQuery && r.whatsapp === zapQuery) return true;
+    if (empQuery && r.nomeEmpresa.trim().toLowerCase() === empQuery) return true;
+    return false;
+  });
+
+  if (!registro && registrosTestesGratis.size > 0) {
+    registro = Array.from(registrosTestesGratis.values())[0];
+  }
+
+  // Verifica se existe algum agente com status TESTE ou testeGratuito ativo
+  const agenteEmTeste = Array.from(agentesAtivos.values()).find(
+    (a) => a.status === 'TESTE' || !!a.testeGratuito?.ativo
+  );
+
+  if (registro || agenteEmTeste) {
+    const agora = Date.now();
+    const expiraMs = agenteEmTeste?.testeGratuito?.expiraEm
+      ? new Date(agenteEmTeste.testeGratuito.expiraEm).getTime()
+      : registro
+      ? new Date(registro.expiraEm).getTime()
+      : 0;
+    const expirado = agora >= expiraMs || !!agenteEmTeste?.testeGratuito?.expirado || !!registro?.expirado;
+
+    return res.json({
+      jaUtilizou: true,
+      expirado,
+      teste: {
+        agenteId: agenteEmTeste?.id || registro?.agenteId,
+        templateId: agenteEmTeste?.templateId || registro?.templateId,
+        nomeAgente: agenteEmTeste?.nomePersonalizado || registro?.nomeAgente,
+        nomeEmpresa: registro?.nomeEmpresa || 'Minha Empresa',
+        iniciadoEm: agenteEmTeste?.testeGratuito?.iniciadoEm || registro?.iniciadoEm,
+        expiraEm: agenteEmTeste?.testeGratuito?.expiraEm || registro?.expiraEm,
+      },
+    });
+  }
+
+  res.json({ jaUtilizou: false, expirado: false, teste: null });
+});
+
 app.post('/api/agentes/iniciar-teste-gratis-5h', (req, res) => {
   const { templateId, nomeEmpresa, segmento, whatsapp, nomePersonalizado } = req.body;
   const tmpl = templates.find((t) => t.id === templateId);
   if (!tmpl) {
     return res.status(404).json({ error: 'Template de agente não encontrado.' });
+  }
+
+  const zapNorm = (whatsapp || '').replace(/\D/g, '');
+  const empNorm = (nomeEmpresa || '').trim().toLowerCase();
+
+  // 🔒 TRAVA INVIOLÁVEL: Verificar se este WhatsApp, Empresa ou Sessão já realizou 1 teste gratuito
+  const testeExistente = Array.from(registrosTestesGratis.values()).find(
+    (r) =>
+      (zapNorm && r.whatsapp === zapNorm) ||
+      (empNorm && r.nomeEmpresa.trim().toLowerCase() === empNorm)
+  ) || Array.from(agentesAtivos.values()).find(
+    (a) => a.status === 'TESTE' || !!a.testeGratuito?.ativo
+  );
+
+  if (testeExistente) {
+    const nomeAgenteTestado =
+      'nomeAgente' in testeExistente
+        ? (testeExistente as RegistroTesteGratis).nomeAgente
+        : (testeExistente as AgenteAtivo).nomePersonalizado;
+
+    return res.status(403).json({
+      error: `Trava de Degustação Única: Sua empresa já realizou o teste gratuito único de 1 agente (${nomeAgenteTestado}). É permitido apenas 1 teste gratuito por empresa. Para continuar utilizando os agentes autônomos, assine o plano mensal no Pix!`,
+      bloqueado: true,
+      jaUtilizou: true,
+      nomeAgenteTestado,
+    });
   }
 
   const prof = profissoes.find((p) => p.id === tmpl.profissaoId);
@@ -762,7 +847,7 @@ app.post('/api/agentes/iniciar-teste-gratis-5h', (req, res) => {
     nomeFantasia: nomeEmpresa || 'Meu Escritório Digital',
     cnpjOuCpf: '00.000.000/0001-00',
     segmento: segmento || tmpl.segmento || 'Serviços',
-    descricao: `Empresa em período de degustação gratuita de 5 horas com o agente ${tmpl.nome}.`,
+    descricao: `Empresa em período de degustação gratuita única de 5 horas com o agente ${tmpl.nome}.`,
     canais: {
       whatsapp: whatsapp || '+55 11 98888-7777',
       whatsappConectado: true,
@@ -796,7 +881,7 @@ app.post('/api/agentes/iniciar-teste-gratis-5h', (req, res) => {
       tempoMedioEntrega: 'Retorno instantâneo',
       politicaCancelamento: 'Cancelamento livre durante as 5h de teste',
       politicaGarantia: 'Garantia total de satisfação ou Pix estornado',
-      observacoes: 'Modo Degustação 5 Horas Ativo',
+      observacoes: 'Modo Degustação Única 5 Horas Ativo',
     },
     permissoes: {
       alcadaMaximaAutonomiaReais: 300.0,
@@ -854,6 +939,22 @@ app.post('/api/agentes/iniciar-teste-gratis-5h', (req, res) => {
 
   agentesAtivos.set(agenteId, novoAgente);
 
+  // Registrar na trava para impedir novos testes no futuro
+  const registro: RegistroTesteGratis = {
+    id: `reg-${Date.now()}`,
+    agenteId,
+    templateId: tmpl.id,
+    nomeAgente: tmpl.nome,
+    nomeEmpresa: empresaCompleta.nomeFantasia,
+    whatsapp: zapNorm,
+    iniciadoEm: agora.toISOString(),
+    expiraEm: expira.toISOString(),
+    expirado: false,
+  };
+  registrosTestesGratis.set(agenteId, registro);
+  if (zapNorm) registrosTestesGratis.set(zapNorm, registro);
+  if (empNorm) registrosTestesGratis.set(empNorm, registro);
+
   // Conversa de acolhimento
   const conversaInicialId = `conv-${Date.now()}`;
   const conversaInicial: Conversa = {
@@ -870,7 +971,7 @@ app.post('/api/agentes/iniciar-teste-gratis-5h', (req, res) => {
       {
         id: `msg-${Date.now()}`,
         remetente: 'agente',
-        texto: `🎉 Olá! O seu período de TESTE GRATUITO DE 5 HORAS foi iniciado com sucesso!\n\nSou o ${novoAgente.nomePersonalizado}, assistente oficial do escritório ${empresaCompleta.nomeFantasia}. Estou pronto para atender seus clientes, tirar dúvidas sobre o catálogo e fechar orçamentos.\n\nVocê tem 5 horas para testar tudo. Após o teste, é só confirmar a assinatura mensal de R$ ${tmpl.precoMensal.toFixed(2)}/mês via Pix para me manter atendendo seu escritório!`,
+        texto: `🎉 Olá! O seu período de TESTE GRATUITO DE 5 HORAS foi iniciado com sucesso!\n\nSou o ${novoAgente.nomePersonalizado}, assistente oficial do escritório ${empresaCompleta.nomeFantasia}. Estou pronto para atender seus clientes, tirar dúvidas sobre o catálogo e fechar orçamentos.\n\n⚠️ Regra: Cada empresa possui direito a 1 teste de 1 agente. Após as 5 horas, para me manter atendendo seu escritório, basta confirmar a assinatura mensal de R$ ${tmpl.precoMensal.toFixed(2)}/mês no Pix!`,
         timestamp: agora.toISOString(),
         estadoInterno: 'TESTE_INICIADO',
         nivelRouter: 'LUNA',
@@ -881,14 +982,14 @@ app.post('/api/agentes/iniciar-teste-gratis-5h', (req, res) => {
 
   res.json({
     sucesso: true,
-    mensagem: '🎁 Teste de 5 horas ativado com sucesso!',
+    mensagem: '🎁 Teste único de 5 horas ativado com sucesso!',
     agente: novoAgente,
     empresa: empresaCompleta,
     conversaInicialId,
   });
 });
 
-// Simular fim ou renovação das 5 horas (útil para testes em tempo real)
+// Expirar teste manualmente (apenas expirar, NUNCA renovar)
 app.post('/api/agentes/:id/expirar-teste-simulado', (req, res) => {
   const agente = agentesAtivos.get(req.params.id);
   if (!agente) return res.status(404).json({ error: 'Agente não encontrado.' });
@@ -898,26 +999,10 @@ app.post('/api/agentes/:id/expirar-teste-simulado', (req, res) => {
     agente.testeGratuito.expiraEm = new Date(Date.now() - 1000).toISOString();
     agente.status = 'PAUSADO';
     agentesAtivos.set(agente.id, agente);
+
+    const reg = registrosTestesGratis.get(agente.id);
+    if (reg) reg.expirado = true;
   }
-
-  res.json({ sucesso: true, agente });
-});
-
-app.post('/api/agentes/:id/renovar-teste-simulado', (req, res) => {
-  const agente = agentesAtivos.get(req.params.id);
-  if (!agente) return res.status(404).json({ error: 'Agente não encontrado.' });
-
-  const agora = new Date();
-  const expira = new Date(agora.getTime() + 5 * 60 * 60 * 1000);
-  agente.testeGratuito = {
-    ativo: true,
-    iniciadoEm: agora.toISOString(),
-    expiraEm: expira.toISOString(),
-    duracaoHoras: 5,
-    expirado: false,
-  };
-  agente.status = 'TESTE';
-  agentesAtivos.set(agente.id, agente);
 
   res.json({ sucesso: true, agente });
 });

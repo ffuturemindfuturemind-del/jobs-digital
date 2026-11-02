@@ -91,35 +91,6 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
     return `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
   };
 
-  const handleSimularExpiracao = async () => {
-    try {
-      const res = await fetch(`/api/agentes/${agente.id}/expirar-teste-simulado`, { method: 'POST' });
-      const data = await res.json();
-      if (data.agente) {
-        setTesteExpirado(true);
-        setTempoRestanteSeg(0);
-        onAtualizarAgente?.(data.agente);
-      }
-    } catch (e) {
-      setTesteExpirado(true);
-      setTempoRestanteSeg(0);
-    }
-  };
-
-  const handleRenovarTeste = async () => {
-    try {
-      const res = await fetch(`/api/agentes/${agente.id}/renovar-teste-simulado`, { method: 'POST' });
-      const data = await res.json();
-      if (data.agente) {
-        setTesteExpirado(false);
-        setTempoRestanteSeg(5 * 3600);
-        onAtualizarAgente?.(data.agente);
-      }
-    } catch (e) {
-      setTesteExpirado(false);
-      setTempoRestanteSeg(5 * 3600);
-    }
-  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -228,29 +199,6 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
                 >
                   <Zap className="w-3.5 h-3.5 fill-current" />
                   <span>Assinar R$ {agente.planoPrecoMensal.toFixed(2)}/mês Pix</span>
-                </button>
-              )}
-
-              {/* Controles para teste rápido de demonstração */}
-              {testeExpirado ? (
-                <button
-                  type="button"
-                  onClick={handleRenovarTeste}
-                  title="Reiniciar mais 5h de teste para demonstração"
-                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 border border-slate-700"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Renovar 5h</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSimularExpiracao}
-                  title="Simular fim das 5 horas agora para ver como funciona"
-                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold flex items-center gap-1 border border-slate-700"
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Simular Fim</span>
                 </button>
               )}
             </div>
@@ -434,12 +382,12 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
               </div>
               <div>
                 <h4 className="text-sm font-black text-white">
-                  Período de Teste Gratuito de 5 Horas Concluído!
+                  Teste Gratuito Único de 5 Horas Concluído!
                 </h4>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Gostou da velocidade de resposta? Assine o plano mensal por apenas{' '}
-                  <span className="text-amber-400 font-bold">R$ {agente.planoPrecoMensal.toFixed(2)}/mês</span> no Pix
-                  para manter seu agente ativo 24h por dia.
+                <p className="text-xs text-slate-300 mt-0.5 max-w-lg">
+                  Regra da Plataforma: Cada empresa tem direito a testar 1 único agente por 5h. Para manter o{' '}
+                  <span className="text-amber-300 font-bold">{agente.nomePersonalizado}</span> ativo 24h por dia para seu escritório, assine o plano mensal por apenas{' '}
+                  <span className="text-emerald-400 font-black">R$ {agente.planoPrecoMensal.toFixed(2)}/mês</span> no Pix.
                 </p>
               </div>
             </div>
@@ -449,21 +397,12 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
                 <button
                   type="button"
                   onClick={() => onAssinarMensal(agente)}
-                  className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-gradient-to-r from-orange-600 via-orange-500 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-600/40 transition-transform hover:scale-105"
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-orange-600 via-orange-500 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-600/40 transition-transform hover:scale-105 active:scale-95"
                 >
                   <Zap className="w-4 h-4 fill-current" />
                   <span>ASSINAR PLANO MENSAL NO PIX</span>
                 </button>
               )}
-
-              <button
-                type="button"
-                onClick={handleRenovarTeste}
-                title="Reiniciar mais 5h de teste para demonstração"
-                className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 border border-slate-700"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
             </div>
           </div>
         ) : (

@@ -14,6 +14,7 @@ import {
   Phone,
   Tag,
   Gift,
+  Lock,
 } from 'lucide-react';
 
 interface ModalTesteGratis5hProps {
@@ -22,6 +23,8 @@ interface ModalTesteGratis5hProps {
   onFechar: () => void;
   onTesteIniciado: (agente: AgenteAtivo, empresa: Empresa) => void;
   onEscolherAssinarDireto: () => void;
+  testeJaUtilizado?: boolean;
+  agenteTestadoNome?: string;
 }
 
 export const ModalTesteGratis5h: React.FC<ModalTesteGratis5hProps> = ({
@@ -30,6 +33,8 @@ export const ModalTesteGratis5h: React.FC<ModalTesteGratis5hProps> = ({
   onFechar,
   onTesteIniciado,
   onEscolherAssinarDireto,
+  testeJaUtilizado,
+  agenteTestadoNome,
 }) => {
   const [nomeEmpresa, setNomeEmpresa] = useState('Meu Escritório Digital');
   const [whatsapp, setWhatsapp] = useState('(11) 98888-7777');
@@ -149,14 +154,58 @@ export const ModalTesteGratis5h: React.FC<ModalTesteGratis5hProps> = ({
             </ul>
           </div>
 
-          {erro && (
-            <div className="p-3.5 rounded-xl bg-red-950/50 border border-red-500/50 text-red-300 text-xs font-medium">
-              {erro}
-            </div>
-          )}
+          {testeJaUtilizado ? (
+            <div className="p-6 text-center space-y-5 bg-slate-950/80 rounded-2xl border border-amber-500/40">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center border border-amber-500/30">
+                <Lock className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white">
+                  Limite de 1 Teste Gratuito por Empresa Atingido
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+                  Regra da Plataforma: Cada empresa tem direito a testar gratuitamente apenas <strong>1 único agente por 5 horas</strong>.
+                  {agenteTestadoNome && (
+                    <span className="block mt-1 text-amber-300 font-semibold">
+                      Você já utilizou o seu período de teste com o {agenteTestadoNome}.
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Para contratar o <strong>{template.nome}</strong> ou reativar seus agentes, ative o plano mensal oficial no Pix com liberação imediata.
+                </p>
+              </div>
 
-          {/* Formulário Simples de Ativação do Teste */}
-          <form onSubmit={handleIniciarTeste} className="space-y-4">
+              <div className="pt-2 space-y-3">
+                <button
+                  type="button"
+                  onClick={onEscolherAssinarDireto}
+                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-600 via-orange-500 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-orange-600/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Zap className="w-4 h-4 fill-current" />
+                  <span>ASSINAR PLANO MENSAL NO PIX (R$ {template.precoMensal.toFixed(2)}/MÊS)</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onFechar}
+                  className="w-full py-2.5 text-center text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+                >
+                  Voltar à vitrine de agentes
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {erro && (
+                <div className="p-3.5 rounded-xl bg-red-950/50 border border-red-500/50 text-red-300 text-xs font-medium">
+                  {erro}
+                </div>
+              )}
+
+              {/* Formulário Simples de Ativação do Teste */}
+              <form onSubmit={handleIniciarTeste} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -265,7 +314,9 @@ export const ModalTesteGratis5h: React.FC<ModalTesteGratis5hProps> = ({
                 Já quero assinar o plano definitivo de R$ {template.precoMensal.toFixed(2)}/mês via Pix direto →
               </button>
             </div>
-          </form>
+            </form>
+          </>
+        )}
         </div>
       </div>
     </div>

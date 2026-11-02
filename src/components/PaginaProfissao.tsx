@@ -1,6 +1,6 @@
 import { Profissao, AgenteTemplate } from '../types';
 import { Card4D } from './Card4D';
-import { ArrowLeft, Shield, Check, Zap, Bell, Sparkles, Cuboid, Gift, Clock } from 'lucide-react';
+import { ArrowLeft, Shield, Check, Zap, Bell, Sparkles, Cuboid, Gift, Clock, Lock } from 'lucide-react';
 
 interface PaginaProfissaoProps {
   profissao: Profissao;
@@ -8,6 +8,9 @@ interface PaginaProfissaoProps {
   onVoltar: () => void;
   onContratarTemplate: (template: AgenteTemplate) => void;
   onTestarGratis?: (template: AgenteTemplate) => void;
+  testeJaUtilizado?: boolean;
+  agenteTestadoInfo?: { agenteId?: string; templateId?: string; nomeAgente?: string; expirado?: boolean } | null;
+  onAbrirAtendimentoAgente?: (agenteId: string) => void;
 }
 
 export const PaginaProfissao: React.FC<PaginaProfissaoProps> = ({
@@ -16,6 +19,9 @@ export const PaginaProfissao: React.FC<PaginaProfissaoProps> = ({
   onVoltar,
   onContratarTemplate,
   onTestarGratis,
+  testeJaUtilizado,
+  agenteTestadoInfo,
+  onAbrirAtendimentoAgente,
 }) => {
   const templatesDaProfissao = templates.filter((t) => t.profissaoId === profissao.id && t.ativo);
 
@@ -170,18 +176,57 @@ export const PaginaProfissao: React.FC<PaginaProfissaoProps> = ({
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
-                      {onTestarGratis && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onTestarGratis(template);
-                          }}
-                          className="px-5 py-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all hover:scale-105 active:scale-95"
-                        >
-                          <Gift className="w-4 h-4 text-emerald-400" />
-                          <span>TESTAR 5H GRÁTIS</span>
-                        </button>
+                      {testeJaUtilizado ? (
+                        template.id === agenteTestadoInfo?.templateId ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (agenteTestadoInfo?.agenteId && onAbrirAtendimentoAgente) {
+                                onAbrirAtendimentoAgente(agenteTestadoInfo.agenteId);
+                              } else if (onTestarGratis) {
+                                onTestarGratis(template);
+                              }
+                            }}
+                            className="px-4 py-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all"
+                            title="Seu agente de degustação escolhido"
+                          >
+                            <Sparkles className="w-4 h-4 text-amber-400" />
+                            <span>SEU TESTE</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alert(
+                                `🔒 Trava de Degustação Única: Cada empresa pode testar apenas 1 agente gratuitamente (você escolheu o ${
+                                  agenteTestadoInfo?.nomeAgente || 'agente anterior'
+                                }).\n\nPara contratar o ${template.nome} para sua empresa, ative o plano mensal no Pix!`
+                              );
+                              onContratarTemplate(template);
+                            }}
+                            className="px-4 py-3 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-400 hover:text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                            title="Limite de 1 teste por empresa já utilizado. Clique para assinar."
+                          >
+                            <Lock className="w-4 h-4 text-amber-400" />
+                            <span>1 TESTE POR EMPRESA</span>
+                          </button>
+                        )
+                      ) : (
+                        onTestarGratis && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTestarGratis(template);
+                            }}
+                            className="px-5 py-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all hover:scale-105 active:scale-95"
+                          >
+                            <Gift className="w-4 h-4 text-emerald-400" />
+                            <span>TESTAR 5H GRÁTIS</span>
+                          </button>
+                        )
                       )}
 
                       <button

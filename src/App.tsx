@@ -51,15 +51,38 @@ export default function App() {
   const [visualizandoPortalCliente, setVisualizandoPortalCliente] = useState<boolean>(false);
   const [agenteSelecionadoPortal, setAgenteSelecionadoPortal] = useState<AgenteAtivo | null>(null);
 
+  // Trava Estrita: 1 Único Teste por Empresa / Dispositivo
+  const [testeJaUtilizado, setTesteJaUtilizado] = useState<boolean>(() => {
+    try {
+      return !!localStorage.getItem('jobs_digital_teste_utilizado');
+    } catch {
+      return false;
+    }
+  });
+  const [agenteTestadoInfo, setAgenteTestadoInfo] = useState<{
+    agenteId?: string;
+    templateId?: string;
+    nomeAgente?: string;
+    expirado?: boolean;
+  } | null>(() => {
+    try {
+      const salvo = localStorage.getItem('jobs_digital_teste_utilizado');
+      return salvo ? JSON.parse(salvo) : null;
+    } catch {
+      return null;
+    }
+  });
+
   // Carregar dados iniciais da API
   const carregarDadosIniciais = async () => {
     try {
-      const [resProfissoes, resTemplates, resMeusAgentes, resDecisoes, resAuth] = await Promise.all([
+      const [resProfissoes, resTemplates, resMeusAgentes, resDecisoes, resAuth, resStatusTeste] = await Promise.all([
         fetch('/api/profissoes').then((r) => r.json()),
         fetch('/api/templates').then((r) => r.json()),
         fetch('/api/meus-agentes').then((r) => r.json()),
         fetch('/api/decisoes').then((r) => r.json()),
         fetch('/api/auth/me').then((r) => r.json()),
+        fetch('/api/agentes/status-teste-gratis').then((r) => r.json()).catch(() => ({ jaUtilizou: false })),
       ]);
 
       if (Array.isArray(resProfissoes)) setProfissoes(resProfissoes);
@@ -68,6 +91,30 @@ export default function App() {
         setMeusAgentes(resMeusAgentes);
         if (resMeusAgentes.length > 0 && resMeusAgentes[0].empresa) {
           setEmpresa(resMeusAgentes[0].empresa);
+        }
+        // Se houver algum agente com status TESTE ou testeGratuito, ativa a trava
+        const agTrial = resMeusAgentes.find((a) => a.status === 'TESTE' || !!a.testeGratuito?.ativo);
+        if (agTrial) {
+          setTesteJaUtilizado(true);
+          const trialInfo = {
+            agenteId: agTrial.id,
+            templateId: agTrial.templateId,
+            nomeAgente: agTrial.nomePersonalizado,
+            expirado: !!agTrial.testeGratuito?.expirado,
+          };
+          setAgenteTestadoInfo(trialInfo);
+          try {
+            localStorage.setItem('jobs_digital_teste_utilizado', JSON.stringify(trialInfo));
+          } catch {}
+        }
+      }
+      if (resStatusTeste && resStatusTeste.jaUtilizou) {
+        setTesteJaUtilizado(true);
+        if (resStatusTeste.teste) {
+          setAgenteTestadoInfo(resStatusTeste.teste);
+          try {
+            localStorage.setItem('jobs_digital_teste_utilizado', JSON.stringify(resStatusTeste.teste));
+          } catch {}
         }
       }
       if (Array.isArray(resDecisoes)) {
@@ -102,6 +149,17 @@ export default function App() {
   // Quando o teste gratuito de 5 horas é iniciado com sucesso
   const handleTesteIniciado = (novoAgente: AgenteAtivo, novaEmpresa: Empresa) => {
     setTemplateParaTestarGratis(null);
+    const trialInfo = {
+      agenteId: novoAgente.id,
+      templateId: novoAgente.templateId,
+      nomeAgente: novoAgente.nomePersonalizado,
+      expirado: false,
+    };
+    setTesteJaUtilizado(true);
+    setAgenteTestadoInfo(trialInfo);
+    try {
+      localStorage.setItem('jobs_digital_teste_utilizado', JSON.stringify(trialInfo));
+    } catch {}
     carregarDadosIniciais();
     setAgenteSelecionadoPortal(novoAgente);
     setVisualizandoPortalCliente(true);
@@ -243,6 +301,15 @@ export default function App() {
           onVoltar={() => setProfissaoSelecionada(null)}
           onContratarTemplate={handleContratarTemplate}
           onTestarGratis={(tmpl) => setTemplateParaTestarGratis(tmpl)}
+          testeJaUtilizado={testeJaUtilizado}
+          agenteTestadoInfo={agenteTestadoInfo}
+          onAbrirAtendimentoAgente={(agId) => {
+            const ag = meusAgentes.find((a) => a.id === agId);
+            if (ag) {
+              setAgenteSelecionadoPortal(ag);
+              setVisualizandoPortalCliente(true);
+            }
+          }}
         />
       );
     }
@@ -256,6 +323,15 @@ export default function App() {
           onContratarTemplate={handleContratarTemplate}
           onTestarGratis={(tmpl) => setTemplateParaTestarGratis(tmpl)}
           busca={busca}
+          testeJaUtilizado={testeJaUtilizado}
+          agenteTestadoInfo={agenteTestadoInfo}
+          onAbrirAtendimentoAgente={(agId) => {
+            const ag = meusAgentes.find((a) => a.id === agId);
+            if (ag) {
+              setAgenteSelecionadoPortal(ag);
+              setVisualizandoPortalCliente(true);
+            }
+          }}
         />
       );
     }
@@ -442,6 +518,8 @@ export default function App() {
           profissao={profissoes.find((p) => p.id === templateParaTestarGratis.profissaoId)}
           onFechar={() => setTemplateParaTestarGratis(null)}
           onTesteIniciado={handleTesteIniciado}
+          testeJaUtilizado={testeJaUtilizado}
+          agenteTestadoNome={agenteTestadoInfo?.nomeAgente}
           onEscolherAssinarDireto={() => {
             const t = templateParaTestarGratis;
             setTemplateParaTestarGratis(null);
