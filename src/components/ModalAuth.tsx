@@ -24,16 +24,6 @@ export const ModalAuth: React.FC<ModalAuthProps> = ({ onFechar, onLoginSucesso }
   const [segmento, setSegmento] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
 
-  const preencherDemo = (tipo: 'dono' | 'admin') => {
-    if (tipo === 'dono') {
-      setEmailLogin('escritorio@demo.com');
-      setSenhaLogin('123456');
-    } else {
-      setEmailLogin('ffuturemindfuturemind@gmail.com');
-      setSenhaLogin('admin123');
-    }
-    setErroMsg('');
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,32 +184,11 @@ export const ModalAuth: React.FC<ModalAuthProps> = ({ onFechar, onLoginSucesso }
             <button
               type="submit"
               disabled={carregando}
-              className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 transition-transform hover:scale-[1.01] disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 transition-transform hover:scale-[1.01] disabled:opacity-50 mt-2"
             >
               {carregando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
               <span>ACESSAR PAINEL DO DONO</span>
             </button>
-
-            {/* Atalhos Rápidos para Teste */}
-            <div className="pt-3 border-t border-slate-800 text-center space-y-2">
-              <span className="text-[11px] text-slate-400 block font-medium">Contas Rápidas de Teste:</span>
-              <div className="flex gap-2 justify-center">
-                <button
-                  type="button"
-                  onClick={() => preencherDemo('dono')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 border border-slate-700"
-                >
-                  🏢 Escritório Demo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => preencherDemo('admin')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-purple-300 border border-purple-500/40"
-                >
-                  ⚡ Admin Platform
-                </button>
-              </div>
-            </div>
           </form>
         ) : (
           /* Formulário de Cadastro */
