@@ -1523,6 +1523,45 @@ function extrairNomeClienteDoTexto(texto: string): string | null {
   let estadoInterno = 'ATENDENDO';
   let ferramentaAcionada = 'CONSULTAR_CLIENTE';
 
+  // Montagem da Missão de Especialidade por Profissão
+  const missaoEspecialidade = (() => {
+    switch (profissao?.id) {
+      case 1:
+        return `SUA ESPECIALIDADE: Atendimento ao Cliente & SAC Humanizado.
+- Foco em acolhimento empático, tirar dúvidas institucionais, orientar clientes sobre pedidos e registrar chamados com método.`;
+      case 2:
+        return `SUA ESPECIALIDADE: Operador Oficial de WhatsApp 24/7.
+- Foco em respostas rápidas, dinâmicas, objetivas e conversacionais, garantindo que o cliente receba atendimento imediato sem filas.`;
+      case 3:
+        return `SUA ESPECIALIDADE: Closer de Vendas & Negociação Comercial.
+- Foco em apresentar produtos, calcular quantidades e pedidos, fechar orçamentos, emitir a chave Pix oficial e conduzir o fechamento de vendas.`;
+      case 4:
+        return `SUA ESPECIALIDADE: Prospecção & Qualificação de Leads (SDR).
+- Foco em mapear as necessidades do cliente, identificar a solução ideal no catálogo e agendar demonstrações ou direcionar para fechamento.`;
+      case 5:
+        return `SUA ESPECIALIDADE: Marketing & Campanhas de Crescimento.
+- Foco em explicar os diferenciais da empresa, pacotes de tração, campanhas e como os produtos geram resultados mensuráveis.`;
+      case 6:
+        return `SUA ESPECIALIDADE: RH, Recrutamento & Seleção de Talentos.
+- Foco em acolher candidatos, orientar sobre vagas abertas, etapas de processos seletivos e cultura da empresa.`;
+      case 7:
+        return `SUA ESPECIALIDADE: Financeiro & Cobrança Amigável.
+- Foco em pagamentos, 2ª via Pix, conferência de comprovantes, conciliação e negociação responsável de débitos.`;
+      case 8:
+        return `SUA ESPECIALIDADE: Inteligência de Dados e BI.
+- Foco em números operacionais, métricas de retorno sobre investimento, relatórios e tomadas de decisão analíticas.`;
+      case 9:
+        return `SUA ESPECIALIDADE: Operações & Logística de Pedidos.
+- Foco em status de ativação, rastreio de prazos de entrega (${empresa.politicas.tempoMedioEntrega}) e destravamento de etapas operacionais.`;
+      case 10:
+        return `SUA ESPECIALIDADE: Suporte Técnico & Diagnóstico N1/N2.
+- Foco em diagnóstico de causa-raiz passo a passo, testes práticos, configuração de integrações e resolução de falhas técnicas.`;
+      default:
+        return `SUA ESPECIALIDADE: ${profissao?.nome || 'Atendimento Especializado'}.
+- Foco em excelência, resolução e segurança operacional sob as regras da ${empresa.nomeFantasia}.`;
+    }
+  })();
+
   // Montagem do Cérebro v5.0 Prompt
   const catalogoFormatado = empresa.catalogo
     .filter((c) => c.ativo)
@@ -1530,8 +1569,14 @@ function extrairNomeClienteDoTexto(texto: string): string | null {
     .join('\n');
 
   const systemInstruction = `
-Você é o ${agente.nomePersonalizado}, Agente Autônomo da ${empresa.nomeFantasia} (${profissao?.nome || 'Suporte'}).
+Você é o ${agente.nomePersonalizado}, Agente Autônomo da ${empresa.nomeFantasia}.
+Cargo Oficial: ${profissao?.nome || 'Especialista Autônomo'}.
 CÉREBRO AGI v5.0 JOBS DIGITAL - SISTEMA COMPLETO DE RACIOCÍNIO & INTELIGÊNCIA
+
+═══════════════════════════════════════════
+SUA MISSÃO NA PROFISSÃO
+═══════════════════════════════════════════
+${missaoEspecialidade}
 
 ═══════════════════════════════════════════
 DIRETRIZES DE RAPPORT & HUMANIZAÇÃO (OBRIGATÓRIO)
@@ -1713,7 +1758,31 @@ ESTILO DA RESPOSTA:
       estadoInterno = 'ATENDENDO';
       ferramentaAcionada = 'CONSULTAR_CLIENTE';
     } else {
-      respostaTexto = `${saudacaoPeriodo}${vocativo}! Como assistente oficial da *${empresa.nomeFantasia}*, estou aqui para te ajudar em tudo: posso te apresentar nossos produtos e serviços, gerar um orçamento personalizado com valores ou tirar dúvidas sobre prazos e condições. O que você gostaria de ver primeiro?`;
+      let falaEspecialidade = `Como assistente oficial da *${empresa.nomeFantasia}*, estou aqui para te ajudar em tudo: posso te apresentar nossos produtos e serviços, gerar um orçamento personalizado com valores ou tirar dúvidas sobre prazos e condições. O que você gostaria de ver primeiro?`;
+
+      if (profissao?.id === 1) {
+        falaEspecialidade = `Como especialista em Atendimento e SAC da *${empresa.nomeFantasia}*, estou à sua disposição para acolher sua solicitação, tirar qualquer dúvida e te orientar sobre nossos produtos e serviços. Em que posso te ajudar agora?`;
+      } else if (profissao?.id === 2) {
+        falaEspecialidade = `Sou o assistente oficial 24h no WhatsApp da *${empresa.nomeFantasia}*! Estou aqui para te dar respostas imediatas sobre nossos produtos, orçamentos e prazos de entrega. O que você precisa no momento?`;
+      } else if (profissao?.id === 3) {
+        falaEspecialidade = `Como especialista em Vendas da *${empresa.nomeFantasia}*, posso te apresentar nosso catálogo completo, simular orçamentos sob medida e já liberar seu pedido com desconto no Pix. Qual solução você gostaria de conhecer primeiro?`;
+      } else if (profissao?.id === 4) {
+        falaEspecialidade = `Como especialista em Soluções da *${empresa.nomeFantasia}*, meu objetivo é entender sua necessidade e te recomendar a melhor ferramenta do nosso catálogo para acelerar seus resultados. Você busca automação, consultoria ou softwares?`;
+      } else if (profissao?.id === 5) {
+        falaEspecialidade = `Como especialista em Marketing da *${empresa.nomeFantasia}*, estou aqui para te mostrar nossos pacotes, integrações e diferenciais com o melhor retorno sobre investimento. O que você gostaria de explorar hoje?`;
+      } else if (profissao?.id === 6) {
+        falaEspecialidade = `Como responsável por RH e Talentos da *${empresa.nomeFantasia}*, posso te orientar sobre nossas vagas, etapas de seleção e processos da equipe. Como posso te auxiliar hoje?`;
+      } else if (profissao?.id === 7) {
+        falaEspecialidade = `Como assistente Financeiro da *${empresa.nomeFantasia}*, posso te auxiliar na emissão de segunda via Pix, conferência de pagamentos, orçamentos e condições especiais para faturamento. O que você precisa resolver?`;
+      } else if (profissao?.id === 8) {
+        falaEspecialidade = `Como analista de Dados e BI da *${empresa.nomeFantasia}*, posso te apresentar métricas de desempenho das nossas soluções, indicadores de retorno e detalhes técnicos de cada produto. O que você gostaria de analisar?`;
+      } else if (profissao?.id === 9) {
+        falaEspecialidade = `Como coordenador Operacional da *${empresa.nomeFantasia}*, estou aqui para acompanhar seus prazos de entrega, status de ativação das ferramentas e andamento dos seus pedidos. Em qual etapa posso te ajudar?`;
+      } else if (profissao?.id === 10) {
+        falaEspecialidade = `Como especialista em Suporte Técnico da *${empresa.nomeFantasia}*, estou aqui para te ajudar no diagnóstico de problemas, orientações de configuração, integrações e testes das ferramentas. Qual dificuldade você está enfrentando?`;
+      }
+
+      respostaTexto = `${saudacaoPeriodo}${vocativo}! ${falaEspecialidade}`;
       estadoInterno = 'TRIAGEM';
       ferramentaAcionada = 'CONSULTAR_CLIENTE';
     }
