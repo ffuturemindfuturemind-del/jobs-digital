@@ -1242,13 +1242,75 @@ app.post('/api/chat', async (req, res) => {
 
   const profissao = profissoes.find((p) => p.id === agente.profissaoId);
 
+// Helper para identificar a saudação correspondente ao horário ou à mensagem do cliente
+function getSaudacaoHorario(mensagemTexto?: string): string {
+  const t = (mensagemTexto || '').toLowerCase();
+  if (t.includes('boa noite') || t.includes('boanoite') || t.includes('boa-noite')) return 'Boa noite';
+  if (t.includes('boa tarde') || t.includes('boatarde') || t.includes('boa-tarde')) return 'Boa tarde';
+  if (t.includes('bom dia') || t.includes('bomdia') || t.includes('bom-dia')) return 'Bom dia';
+  if (t.includes('boa madrugada')) return 'Boa noite';
+
+  // Fuso de Brasília (UTC-3)
+  const agora = new Date();
+  const horaBrasilia = (agora.getUTCHours() - 3 + 24) % 24;
+  if (horaBrasilia >= 5 && horaBrasilia < 12) return 'Bom dia';
+  if (horaBrasilia >= 12 && horaBrasilia < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+// Helper para extrair o nome do cliente a partir do texto
+function extrairNomeClienteDoTexto(texto: string): string | null {
+  const t = texto.trim();
+  const regexes = [
+    /(?:meu nome [ée]|me chamo|sou o|sou a|aqui [ée] o|aqui [ée] a|pode me chamar de)\s+([A-ZÀ-Úa-zà-ú]{2,20})/i,
+    /^(?:sou|chamo|aqui [ée])\s+([A-ZÀ-Úa-zà-ú]{2,20})/i,
+  ];
+  for (const r of regexes) {
+    const m = t.match(r);
+    if (m && m[1]) {
+      const n = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+      const ignorar = [
+        'cliente',
+        'agente',
+        'amigo',
+        'senhor',
+        'senhora',
+        'bom',
+        'boa',
+        'ola',
+        'olá',
+        'novo',
+        'nova',
+        'aqui',
+        'tudo',
+        'sim',
+        'nao',
+        'não',
+      ];
+      if (!ignorar.includes(n.toLowerCase())) return n;
+    }
+  }
+  return null;
+}
+
   // Obter ou criar conversa
   let conversa = conversas.get(conversaId);
+  const nomeParam = (clienteNome || '').trim();
+  const ehNomeParamGenerico =
+    !nomeParam ||
+    [
+      'cliente',
+      'cliente whatsapp',
+      'cliente do escritório',
+      'cliente teste (escritório)',
+      'cliente teste',
+    ].includes(nomeParam.toLowerCase());
+
   if (!conversa) {
     conversa = {
       id: conversaId || `conv-${Date.now()}`,
       agenteId,
-      clienteNome: clienteNome || 'Cliente WhatsApp',
+      clienteNome: !ehNomeParamGenerico ? nomeParam : 'Cliente',
       clienteContato: '+55 11 99999-9999',
       canal: 'WHATSAPP',
       estadoAtual: 'ATENDENDO',
@@ -1258,7 +1320,28 @@ app.post('/api/chat', async (req, res) => {
       mensagens: [],
     };
     conversas.set(conversa.id, conversa);
+  } else if (!ehNomeParamGenerico) {
+    conversa.clienteNome = nomeParam;
   }
+
+  // Tentar extrair nome da própria mensagem do cliente
+  const nomeExtraido = extrairNomeClienteDoTexto(mensagem);
+  if (nomeExtraido) {
+    conversa.clienteNome = nomeExtraido;
+  }
+
+  const ehNomeGenerico =
+    !conversa.clienteNome ||
+    [
+      'cliente',
+      'cliente whatsapp',
+      'cliente do escritório',
+      'cliente teste (escritório)',
+      'cliente teste',
+    ].includes(conversa.clienteNome.trim().toLowerCase());
+  const primeiroNome = ehNomeGenerico ? '' : conversa.clienteNome.trim().split(' ')[0];
+  const vocativo = primeiroNome ? `, ${primeiroNome}` : '';
+  const saudacaoPeriodo = getSaudacaoHorario(mensagem);
 
   // Se a conversa foi assumida pelo humano e o remetente for o humano respondendo
   const msgCliente: MensagemChat = {
@@ -1273,8 +1356,25 @@ app.post('/api/chat', async (req, res) => {
   let nivelRouter: NivelRouter = 'TERRA';
   const textoMin = mensagem.toLowerCase();
 
-  if (textoMin.length < 20 && (textoMin.includes('oi') || textoMin.includes('olá') || textoMin.includes('boa tarde') || textoMin.includes('bom dia'))) {
-    nivelRouter = 'LUNA'; // Simples, alta velocidade
+  const ehCumprimento =
+    textoMin.includes('oi') ||
+    textoMin.includes('olá') ||
+    textoMin.includes('ola') ||
+    textoMin.includes('bom dia') ||
+    textoMin.includes('bomdia') ||
+    textoMin.includes('boa tarde') ||
+    textoMin.includes('boatarde') ||
+    textoMin.includes('boa noite') ||
+    textoMin.includes('boanoite') ||
+    textoMin.includes('boa-noite') ||
+    textoMin.includes('boa-tarde') ||
+    textoMin.includes('bom-dia') ||
+    textoMin.includes('opa') ||
+    textoMin.includes('e aí') ||
+    textoMin.includes('e ai');
+
+  if (textoMin.length < 30 && ehCumprimento) {
+    nivelRouter = 'LUNA'; // Simples, alta velocidade com rapport
   } else if (
     textoMin.includes('desconto') ||
     textoMin.includes('reembolso') ||
@@ -1285,7 +1385,12 @@ app.post('/api/chat', async (req, res) => {
     textoMin.includes('processo')
   ) {
     nivelRouter = 'ASTRA'; // Alto risco, análise de alçada e HITL
-  } else if (textoMin.includes('comprar') || textoMin.includes('preço') || textoMin.includes('pix') || textoMin.includes('pagar')) {
+  } else if (
+    textoMin.includes('comprar') ||
+    textoMin.includes('preço') ||
+    textoMin.includes('pix') ||
+    textoMin.includes('pagar')
+  ) {
     nivelRouter = 'SOL'; // Negociação comercial com controle
   }
 
@@ -1297,9 +1402,20 @@ app.post('/api/chat', async (req, res) => {
 
   const pedeDescontoAlto =
     (textoMin.includes('desconto') || textoMin.includes('mais barato')) &&
-    (textoMin.includes('20%') || textoMin.includes('30%') || textoMin.includes('50%') || textoMin.includes('metade'));
-  const pedeHumano = textoMin.includes('falar com humano') || textoMin.includes('pessoa de verdade') || textoMin.includes('gerente') || textoMin.includes('dono');
-  const ameacaJuridica = textoMin.includes('procon') || textoMin.includes('processo') || textoMin.includes('advogado') || textoMin.includes('golpe');
+    (textoMin.includes('20%') ||
+      textoMin.includes('30%') ||
+      textoMin.includes('50%') ||
+      textoMin.includes('metade'));
+  const pedeHumano =
+    textoMin.includes('falar com humano') ||
+    textoMin.includes('pessoa de verdade') ||
+    textoMin.includes('gerente') ||
+    textoMin.includes('dono');
+  const ameacaJuridica =
+    textoMin.includes('procon') ||
+    textoMin.includes('processo') ||
+    textoMin.includes('advogado') ||
+    textoMin.includes('golpe');
 
   if (pedeDescontoAlto) {
     acionarEscalaHumana = true;
@@ -1331,6 +1447,23 @@ app.post('/api/chat', async (req, res) => {
   const systemInstruction = `
 Você é o ${agente.nomePersonalizado}, Agente Autônomo da ${empresa.nomeFantasia} (${profissao?.nome || 'Suporte'}).
 CÉREBRO AGI v5.0 JOBS DIGITAL - SISTEMA COMPLETO DE INTELIGÊNCIA
+
+═══════════════════════════════════════════
+DIRETRIZES DE RAPPORT & HUMANIZAÇÃO (OBRIGATÓRIO)
+═══════════════════════════════════════════
+1. CUMPRIMENTOS E PERÍODO DO DIA:
+   - Período do dia atual: "${saudacaoPeriodo}".
+   - Se o cliente iniciar ou enviar qualquer cumprimento ("Boa noite", "Bom dia", "Boa tarde", "Oi", "Olá", "Opa", etc.), VOCÊ DEVE OBRIGATORIAMENTE CUMPRIMENTÁ-LO DE VOLTA com a saudação de período adequada ("${saudacaoPeriodo}!") logo no início da sua resposta.
+   - NUNCA responda a uma saudação de forma fria, robótica ou sem retribuir o cumprimento.
+2. NOME DO CLIENTE:
+   ${
+     primeiroNome
+       ? `- O nome do cliente é "${primeiroNome}". Chame-o pelo nome próprio ("${primeiroNome}") com respeito, carinho e rapport humanizado em suas respostas (ex: "${saudacaoPeriodo}, ${primeiroNome}!", "Com certeza, ${primeiroNome}.").`
+       : '- O nome do cliente ainda não foi identificado. Retribua a saudação com alto nível de rapport ("' +
+         saudacaoPeriodo +
+         '! É um prazer falar com você!") e, de forma educada, pergunte como pode chamá-lo.'
+   }
+   - Se o cliente disser como se chama (ex: "meu nome é...", "sou o..."), acolha e passe a chamá-lo imediatamente por esse nome.
 
 ═══════════════════════════════════════════
 DIRETRIZES INEGOCIÁVEIS (TRAVAS ABSOLUTAS)
@@ -1397,29 +1530,47 @@ ESTILO DA RESPOSTA:
 
   // Fallback inteligente caso Gemini não retorne ou não haja API Key
   if (!respostaTexto) {
-    if (textoMin.includes('oi') || textoMin.includes('olá') || textoMin.includes('boa tarde')) {
-      respostaTexto = `Olá! 👋 Sou o ${agente.nomePersonalizado}, assistente oficial da ${empresa.nomeFantasia}. Estou aqui para te ajudar com nossos produtos e serviços. O que você procura hoje?`;
+    if (ehCumprimento) {
+      if (primeiroNome) {
+        respostaTexto = `${saudacaoPeriodo}, ${primeiroNome}! 👋 É um prazer enorme falar com você. Sou o ${agente.nomePersonalizado}, assistente oficial da ${empresa.nomeFantasia}. Como posso te ajudar hoje?`;
+      } else {
+        respostaTexto = `${saudacaoPeriodo}! 👋 É um prazer enorme falar com você. Sou o ${agente.nomePersonalizado}, assistente oficial da ${empresa.nomeFantasia}. Como posso te ajudar hoje? Se quiser me dizer seu nome, terei o maior prazer em te chamar por ele!`;
+      }
       estadoInterno = 'ACOLHIMENTO';
       ferramentaAcionada = 'CONSULTAR_CATALOGO';
     } else if (pedeDescontoAlto) {
-      respostaTexto = `Entendo o seu interesse em um desconto especial! Nosso desconto máximo pré-autorizado é de até ${empresa.permissoes.descontoMaximoPermitidoPercent}%. Para a condição que você solicitou, acabei de encaminhar para a aprovação da diretoria (${empresa.nomeFantasia}) e já te retorno com a decisão oficial.`;
+      respostaTexto = `Entendo perfeitamente o seu interesse em uma condição especial${vocativo}! Nosso desconto máximo pré-autorizado é de até ${empresa.permissoes.descontoMaximoPermitidoPercent}%. Para a proposta que você solicitou, acabei de encaminhar para a aprovação da diretoria (${empresa.nomeFantasia}) e já te retorno com a decisão oficial.`;
       estadoInterno = 'AGUARDANDO_HUMANO';
       ferramentaAcionada = 'ESCALAR_PARA_HUMANO';
     } else if (pedeHumano) {
-      respostaTexto = `Com certeza! Já notifiquei a equipe humana da ${empresa.nomeFantasia} com todo o histórico do nosso atendimento para que você não precise repetir nada. Um especialista vai assumir este canal em instantes.`;
+      respostaTexto = `Com certeza${vocativo}! Já notifiquei a equipe humana da ${empresa.nomeFantasia} com todo o histórico do nosso atendimento para que você não precise repetir nada. Um especialista vai assumir este canal em instantes.`;
       estadoInterno = 'AGUARDANDO_HUMANO';
       ferramentaAcionada = 'ESCALAR_PARA_HUMANO';
-    } else if (textoMin.includes('preço') || textoMin.includes('quanto custa') || textoMin.includes('catalogo')) {
+    } else if (
+      textoMin.includes('preço') ||
+      textoMin.includes('quanto custa') ||
+      textoMin.includes('catalogo') ||
+      textoMin.includes('catálogo')
+    ) {
       const primeiroItem = empresa.catalogo[0];
-      respostaTexto = `Temos opções ideais no catálogo da ${empresa.nomeFantasia}! Por exemplo, o ${primeiroItem?.nome || 'nosso principal item'} sai por R$ ${(primeiroItem?.preco || 197).toFixed(2)}. Posso te apresentar as condições de entrega ou gerar o Pix para liberação imediata?`;
+      respostaTexto = `${saudacaoPeriodo}${vocativo}! Temos excelentes opções no catálogo da ${empresa.nomeFantasia}. Por exemplo, o ${
+        primeiroItem?.nome || 'nosso principal item'
+      } sai por R$ ${(primeiroItem?.preco || 197).toFixed(2)}. Posso te apresentar as condições de entrega ou gerar o Pix para liberação imediata?`;
       estadoInterno = 'PROPOSTA';
       ferramentaAcionada = 'CONSULTAR_PRECO';
-    } else if (textoMin.includes('pix') || textoMin.includes('comprar') || textoMin.includes('fechar')) {
-      respostaTexto = `Perfeito! Para agilizar seu pedido com total segurança, a chave Pix oficial da empresa é ${empresa.canais.emailComercial || 'ffuturemindfuturemind@gmail.com'}. Posso calcular o valor final e emitir o código Copia e Cola para você?`;
+    } else if (
+      textoMin.includes('pix') ||
+      textoMin.includes('comprar') ||
+      textoMin.includes('fechar') ||
+      textoMin.includes('pagar')
+    ) {
+      respostaTexto = `Perfeito${vocativo}! Para agilizar seu pedido com total segurança, a chave Pix oficial da empresa é ${
+        empresa.canais.emailComercial || 'ffuturemindfuturemind@gmail.com'
+      }. Posso calcular o valor final e emitir o código Copia e Cola para você?`;
       estadoInterno = 'CHECKOUT';
       ferramentaAcionada = 'CALCULAR_PEDIDO';
     } else {
-      respostaTexto = `Entendido! Registrei sua solicitação na base de dados da ${empresa.nomeFantasia}. Me conta com mais detalhes para que eu possa direcionar a melhor solução dentro das nossas políticas de atendimento?`;
+      respostaTexto = `${saudacaoPeriodo}${vocativo}! Entendido perfeitamente. Registrei sua solicitação na base de dados da ${empresa.nomeFantasia}. Me conte com mais detalhes para que eu possa direcionar a melhor solução dentro das nossas políticas de atendimento?`;
       estadoInterno = 'TRIAGEM';
       ferramentaAcionada = 'CONSULTAR_CLIENTE';
     }

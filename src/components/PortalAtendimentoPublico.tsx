@@ -19,6 +19,8 @@ import {
   Lock,
   RefreshCw,
   AlertTriangle,
+  User,
+  Edit2,
 } from 'lucide-react';
 
 interface PortalAtendimentoPublicoProps {
@@ -29,6 +31,26 @@ interface PortalAtendimentoPublicoProps {
   onAtualizarAgente?: (agente: AgenteAtivo) => void;
 }
 
+// Helper para calcular saudação temporal exata (Fuso Brasília / Horário Local)
+export const getSaudacaoHorarioAtual = (): string => {
+  try {
+    const horaStr = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: 'numeric',
+      hour12: false,
+    }).format(new Date());
+    const hora = parseInt(horaStr, 10);
+    if (hora >= 5 && hora < 12) return 'Bom dia';
+    if (hora >= 12 && hora < 18) return 'Boa tarde';
+    return 'Boa noite';
+  } catch {
+    const hora = new Date().getHours();
+    if (hora >= 5 && hora < 12) return 'Bom dia';
+    if (hora >= 12 && hora < 18) return 'Boa tarde';
+    return 'Boa noite';
+  }
+};
+
 export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> = ({
   agente,
   empresa,
@@ -36,16 +58,38 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
   onAssinarMensal,
   onAtualizarAgente,
 }) => {
-  const [mensagens, setMensagens] = useState<MensagemChat[]>([
-    {
-      id: 'msg-pub-0',
-      remetente: 'agente',
-      texto: `Olá! 👋 Sou o ${agente.nomePersonalizado}, assistente oficial do escritório ${empresa.nomeFantasia}. Como posso te ajudar hoje?`,
-      timestamp: new Date().toISOString(),
-      estadoInterno: 'ACOLHIMENTO',
-      nivelRouter: 'LUNA',
-    },
-  ]);
+  // Nome do cliente persistente
+  const [nomeCliente, setNomeCliente] = useState<string>(() => {
+    try {
+      return localStorage.getItem('jobs_digital_cliente_nome') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [inputNomeTemp, setInputNomeTemp] = useState('');
+
+  const [mensagens, setMensagens] = useState<MensagemChat[]>(() => {
+    const saud = getSaudacaoHorarioAtual();
+    const nomeSalvo = (() => {
+      try {
+        return localStorage.getItem('jobs_digital_cliente_nome') || '';
+      } catch {
+        return '';
+      }
+    })();
+    const cumprimento = nomeSalvo.trim() ? `${saud}, ${nomeSalvo.trim()}!` : `${saud}!`;
+    return [
+      {
+        id: 'msg-pub-0',
+        remetente: 'agente',
+        texto: `${cumprimento} 👋 Sou o ${agente.nomePersonalizado}, assistente oficial do escritório ${empresa.nomeFantasia}. Como posso te ajudar hoje?`,
+        timestamp: new Date().toISOString(),
+        estadoInterno: 'ACOLHIMENTO',
+        nivelRouter: 'LUNA',
+      },
+    ];
+  });
   const [inputTexto, setInputTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [copiadoLink, setCopiadoLink] = useState(false);
@@ -122,7 +166,7 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
           agenteId: agente.id,
           conversaId: `conv-pub-${agente.id}`,
           mensagem: texto,
-          clienteNome: 'Cliente do Escritório',
+          clienteNome: nomeCliente.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -130,6 +174,19 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
       if (data.testeExpirado) {
         setTesteExpirado(true);
         setTempoRestanteSeg(0);
+      }
+
+      // Atualiza nome caso o agente tenha extraído ou confirmado
+      if (data.conversa?.clienteNome) {
+        const nomeRecebido = data.conversa.clienteNome;
+        if (!['Cliente', 'cliente', 'Cliente do Escritório'].includes(nomeRecebido)) {
+          setNomeCliente(nomeRecebido);
+          try {
+            localStorage.setItem('jobs_digital_cliente_nome', nomeRecebido);
+          } catch (err) {
+            // ignore
+          }
+        }
       }
 
       if (data.sucesso && data.mensagem) {
@@ -312,6 +369,83 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
           )}
         </div>
 
+        {/* Barra de Personalização & Rapport do Cliente */}
+        <div className="px-4 py-2.5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <User className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+            {editandoNome ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const n = inputNomeTemp.trim();
+                  setNomeCliente(n);
+                  try {
+                    if (n) localStorage.setItem('jobs_digital_cliente_nome', n);
+                    else localStorage.removeItem('jobs_digital_cliente_nome');
+                  } catch (err) {
+                    // ignore
+                  }
+                  setEditandoNome(false);
+                }}
+                className="flex items-center gap-1.5"
+              >
+                <input
+                  type="text"
+                  placeholder="Seu nome (ex: Carlos, Mariana)..."
+                  value={inputNomeTemp}
+                  onChange={(e) => setInputNomeTemp(e.target.value)}
+                  autoFocus
+                  className="bg-slate-900 border border-orange-500/50 rounded-lg px-2.5 py-0.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-500 w-44"
+                />
+                <button
+                  type="submit"
+                  className="px-2 py-0.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[11px] font-bold"
+                >
+                  Salvar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditandoNome(false)}
+                  className="text-[11px] text-slate-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+              </form>
+            ) : (
+              <div className="flex items-center gap-2 text-slate-300">
+                <span>
+                  {nomeCliente.trim() ? (
+                    <>
+                      Conversando como:{' '}
+                      <strong className="text-orange-400 font-bold">{nomeCliente.trim()}</strong>
+                    </>
+                  ) : (
+                    <span className="text-slate-400">
+                      Identifique-se para atendimento personalizado com seu nome
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInputNomeTemp(nomeCliente);
+                    setEditandoNome(true);
+                  }}
+                  className="text-[10px] text-orange-400 hover:text-orange-300 underline font-semibold flex items-center gap-0.5"
+                >
+                  <Edit2 className="w-2.5 h-2.5" />
+                  <span>{nomeCliente.trim() ? 'Alterar' : 'Informar nome'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-400">
+            <Clock className="w-3 h-3 text-emerald-400" />
+            <span>Saudação: <strong className="text-slate-200">{getSaudacaoHorarioAtual()}</strong></span>
+          </div>
+        </div>
+
         {/* Mensagens do Chat */}
         <div
           ref={scrollRef}
@@ -348,7 +482,7 @@ export const PortalAtendimentoPublico: React.FC<PortalAtendimentoPublicoProps> =
                           <span>{agente.nomePersonalizado}</span>
                         </>
                       ) : (
-                        <span>Você (Cliente)</span>
+                        <span>Você ({nomeCliente.trim() || 'Cliente'})</span>
                       )}
                     </span>
                     <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
