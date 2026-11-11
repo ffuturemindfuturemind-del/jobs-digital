@@ -1594,21 +1594,21 @@ ESTILO DA RESPOSTA:
         parts: [{ text: m.texto }],
       }));
 
-      const modelResponse = await aiClient.models.generateContent({
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 3500)
+      );
+      const geminiPromise = aiClient.models.generateContent({
         model: 'gemini-3.8-flash',
-        contents: [
-          ...chatHistory,
-          {
-            role: 'user',
-            parts: [{ text: mensagem }],
-          },
-        ],
+        contents: chatHistory,
         config: {
           systemInstruction,
         },
       });
 
-      respostaTexto = modelResponse.text || '';
+      const modelResponse = await Promise.race([geminiPromise, timeoutPromise]);
+      if (modelResponse && 'text' in modelResponse) {
+        respostaTexto = modelResponse.text || '';
+      }
     } catch (err: any) {
       console.error('Erro na chamada Gemini:', err);
     }
@@ -1619,6 +1619,34 @@ ESTILO DA RESPOSTA:
   if (!respostaTexto) {
     const itensAtivos = empresa.catalogo.filter((c) => c.ativo);
 
+    // Detecção de seleção de produto específico e cálculo de quantidade
+    let produtoSelecionado = null;
+    let quantidadePedida = 1;
+
+    const matchQtd = textoMin.match(/(?:^|\D)(\d{1,3})\s*(?:x|unidades?|unid?|de)?\s*/);
+    if (matchQtd && matchQtd[1]) {
+      const q = parseInt(matchQtd[1], 10);
+      if (!isNaN(q) && q > 0 && q <= 100) quantidadePedida = q;
+    } else if (textoMin.includes('duas') || textoMin.includes('dois')) {
+      quantidadePedida = 2;
+    } else if (textoMin.includes('três') || textoMin.includes('tres')) {
+      quantidadePedida = 3;
+    }
+
+    for (const item of itensAtivos) {
+      const nomeNorm = item.nome.toLowerCase();
+      const matchDireto =
+        (nomeNorm.includes('automação') && (textoMin.includes('automação') || textoMin.includes('automacao') || textoMin.includes('kit'))) ||
+        (nomeNorm.includes('cérebro') && (textoMin.includes('cérebro') || textoMin.includes('cerebro') || textoMin.includes('combo') || textoMin.includes('anual'))) ||
+        (nomeNorm.includes('consultoria') && textoMin.includes('consultoria')) ||
+        (nomeNorm.includes('suporte') && textoMin.includes('suporte'));
+
+      if (matchDireto || textoMin.includes(nomeNorm)) {
+        produtoSelecionado = item;
+        break;
+      }
+    }
+
     if (ehSaudacaoPura) {
       if (primeiroNome) {
         respostaTexto = `${saudacaoPeriodo}, ${primeiroNome}! 👋 É um prazer enorme falar com você. Sou o ${agente.nomePersonalizado}, assistente oficial da ${empresa.nomeFantasia}. Como posso te ajudar hoje? (Posso te apresentar nossos produtos e serviços, gerar um orçamento detalhado ou tirar dúvidas!)`;
@@ -1627,6 +1655,12 @@ ESTILO DA RESPOSTA:
       }
       estadoInterno = 'ACOLHIMENTO';
       ferramentaAcionada = 'CONSULTAR_CATALOGO';
+    } else if (produtoSelecionado && !querProdutos && !querOrcamento) {
+      const valorTotal = produtoSelecionado.preco * quantidadePedida;
+      const chavePix = empresa.canais.emailComercial || 'ffuturemindfuturemind@gmail.com';
+      respostaTexto = `${saudacaoPeriodo}${vocativo}! Excelente escolha! 🚀\n\n📦 *Resumo do Pedido:*\n• ${quantidadePedida}x *${produtoSelecionado.nome}*\n• Valor unitário: R$ ${produtoSelecionado.preco.toFixed(2)}\n• *Valor Total:* R$ ${valorTotal.toFixed(2)}\n\n⚡ *Prazo de Liberação:* ${empresa.politicas.tempoMedioEntrega}\n🛡️ *Garantia:* ${empresa.politicas.politicaCancelamento}\n🔑 *Chave Pix Oficial:* \`${chavePix}\`\n\nPosso gerar o código Pix Copia e Cola para você concluir agora e já receber o acesso?`;
+      estadoInterno = 'CHECKOUT';
+      ferramentaAcionada = 'CALCULAR_PEDIDO';
     } else if (querProdutos) {
       const listaProdutos =
         itensAtivos.length > 0
